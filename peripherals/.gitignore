@@ -5,6 +5,7 @@
 
 # For Quartus:
 */sint/*
+!*/sint/de10_lite.vhd
 !*/sint/de10_lite.qpf
 !*/sint/de10_lite.qws
 !*/sint/de10_lite.qsf

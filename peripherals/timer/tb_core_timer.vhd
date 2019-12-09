@@ -40,12 +40,13 @@ architecture RTL of tb_core_timer is
 
 	signal idata : std_logic_vector(31 downto 0);
 
-	signal daddress : natural;
-	signal ddata_r  : std_logic_vector(31 downto 0);
-	signal ddata_w  : std_logic_vector(31 downto 0);
-	signal dmask    : std_logic_vector(3 downto 0);
-	signal dcsel    : std_logic_vector(1 downto 0);
-	signal d_we     : std_logic := '0';
+	signal daddress   : natural;
+	signal ddata_r    : std_logic_vector(31 downto 0);
+	signal ddata_w    : std_logic_vector(31 downto 0);
+	signal dmask      : std_logic_vector(3 downto 0);
+	signal dcsel      : std_logic_vector(1 downto 0);
+	signal d_we       : std_logic := '0';
+	signal signal_ext : std_logic := '0';
 
 	signal iaddress : integer range 0 to IMEMORY_WORDS - 1 := 0;
 
@@ -101,7 +102,7 @@ begin
 			timer_reset => timer_reset,
 			timer_mode  => timer_mode,
 			prescaler   => prescaler,
-            top_counter => top_counter,
+			top_counter => top_counter,
 			compare_0A  => compare_0A,
 			compare_0B  => compare_0B,
 			compare_1A  => compare_1A,
@@ -192,14 +193,15 @@ begin
 			MEMORY_WORDS => DMEMORY_WORDS
 		)
 		port map(
-			rst     => rst,
-			clk     => clk,
-			data    => ddata_w,
-			address => dmemory_address,
-			we      => d_we,
-			csel    => dcsel(0),
-			dmask   => dmask,
-			q       => ddata_r_mem
+			rst        => rst,
+			clk        => clk,
+			data       => ddata_w,
+			address    => dmemory_address,
+			we         => d_we,
+			csel       => dcsel(0),
+			dmask      => dmask,
+			signal_ext => signal_ext,
+			q          => ddata_r_mem
 		);
 
 	-- Adress space mux ((check sections.ld) -> Data chip select:
@@ -228,6 +230,7 @@ begin
 			ddata_w  => ddata_w,
 			d_we     => d_we,
 			d_rd     => d_rd,
+			d_sig    => signal_ext,
 			dcsel    => dcsel,
 			dmask    => dmask,
 			state    => cpu_state
@@ -261,23 +264,21 @@ begin
 					-- HEX5 <= ddata_w(7 downto 0);
 					elsif to_unsigned(daddress, 32)(8 downto 0) = x"08" then -- TIMER_ADDRESS
 						timer_reset <= ddata_w(0);
+						timer_mode  <= unsigned(ddata_w(2 downto 1));
+						prescaler   <= unsigned(ddata_w(18 downto 3));
 					elsif to_unsigned(daddress, 32)(8 downto 0) = x"09" then -- TIMER_ADDRESS
-						timer_mode <= unsigned(ddata_w(1 downto 0));
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0A" then -- TIMER_ADDRESS
-						prescaler <= unsigned(ddata_w(15 downto 0));
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0B" then -- TIMER_ADDRESS
 						top_counter <= unsigned(ddata_w);
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0C" then -- TIMER_ADDRESS
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0A" then -- TIMER_ADDRESS
 						compare_0A <= unsigned(ddata_w);
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0D" then -- TIMER_ADDRESS
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0B" then -- TIMER_ADDRESS
 						compare_0B <= unsigned(ddata_w);
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0E" then -- TIMER_ADDRESS
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0C" then -- TIMER_ADDRESS
 						compare_1A <= unsigned(ddata_w);
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0F" then -- TIMER_ADDRESS
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0D" then -- TIMER_ADDRESS
 						compare_1B <= unsigned(ddata_w);
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"10" then -- TIMER_ADDRESS
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0E" then -- TIMER_ADDRESS
 						compare_2A <= unsigned(ddata_w);
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"11" then -- TIMER_ADDRESS
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0F" then -- TIMER_ADDRESS
 						compare_2B <= unsigned(ddata_w);
 					end if;
 				end if;
@@ -291,16 +292,32 @@ begin
 		if rst = '1' then
 			input_in <= (others => '0');
 		else
-
 			if rising_edge(clk) then
 				if (d_rd = '1') and (dcsel = "10") then
 					if to_unsigned(daddress, 32)(8 downto 0) = x"00" then
 						input_in(4 downto 0) <= SW(4 downto 0);
 					elsif to_unsigned(daddress, 32)(8 downto 0) = x"04" then
 						input_in(7 downto 0) <= data_out;
-					elsif to_unsigned(daddress, 32)(8 downto 0) = x"12" then
-					    input_in(2 downto 0) <= output_A(2 downto 0);
-					    input_in(5 downto 3) <= output_B(2 downto 0);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"08" then -- TIMER_ADDRESS
+						input_in(0)            <= timer_reset;
+						input_in(2 downto 1)   <= std_logic_vector(timer_mode);
+						input_in(18 downto 3)  <= std_logic_vector(prescaler);
+						input_in(21 downto 19) <= output_A;
+						input_in(24 downto 22) <= output_B;
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"09" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(top_counter);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0A" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(compare_0A);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0B" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(compare_0B);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0C" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(compare_1A);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0D" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(compare_1B);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0E" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(compare_2A);
+					elsif to_unsigned(daddress, 32)(8 downto 0) = x"0F" then -- TIMER_ADDRESS
+						input_in <= std_logic_vector(compare_2B);
 					end if;
 				end if;
 			end if;
