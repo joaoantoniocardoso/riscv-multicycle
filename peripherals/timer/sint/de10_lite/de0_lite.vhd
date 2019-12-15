@@ -283,12 +283,6 @@ begin
 				input_in <= (others => '0');
 				if (d_rd = '1') and (dcsel = "10") then
 					input_in(4 downto 0) <= SW(4 downto 0);
-				elsif to_unsigned(daddress, 32)(8 downto 0) = x"08" then
-					input_in(0)            <= timer_reset;
-					input_in(2 downto 1)   <= std_logic_vector(timer_mode);
-					input_in(18 downto 3)  <= std_logic_vector(prescaler);
-					input_in(21 downto 19) <= output_A;
-					input_in(24 downto 22) <= output_B;
 				elsif to_unsigned(daddress, 32)(8 downto 0) = x"08" then -- TIMER_ADDRESS
 					input_in(0)            <= timer_reset;
 					input_in(2 downto 1)   <= std_logic_vector(timer_mode);
